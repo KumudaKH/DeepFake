@@ -193,8 +193,8 @@ Deepfake_Forensics_System/
 
 1. **Clone the repository:**
    ```bash
-   git clone <REPO_URL>
-   cd DEEPFAKE
+   git clone https://github.com/KumudaKH/DeepFake.git
+   cd DeepFake
    ```
 
 2. **Backend Setup (Python):**
