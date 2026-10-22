@@ -47,10 +47,14 @@ venv.bak/
 # Data directories (keep folder structure via .gitkeep, ignore datasets)
 data/raw/images/*
 !data/raw/images/.gitkeep
+data/raw/videos/*
+!data/raw/videos/.gitkeep
 data/raw/audio/*
 !data/raw/audio/.gitkeep
 data/processed/images/*
 !data/processed/images/.gitkeep
+data/processed/frames/*
+!data/processed/frames/.gitkeep
 data/processed/audio/*
 !data/processed/audio/.gitkeep
 
@@ -65,10 +69,20 @@ data/**/*.json
 data/**/*.h5
 data/**/*.npy
 data/**/*.npz
+data/**/*.mp4
+data/**/*.avi
+data/**/*.mov
+data/**/*.mkv
 
 # Model weights, checkpoints, and serialized artifacts
 models/image/*
 !models/image/.gitkeep
+models/video/*
+!models/video/.gitkeep
+models/unet/*
+!models/unet/.gitkeep
+models/yunet/*
+!models/yunet/.gitkeep
 models/audio/*
 !models/audio/.gitkeep
 models/**/*.pt
