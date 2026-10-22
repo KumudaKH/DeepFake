@@ -1,27 +1,23 @@
-# Multimodal Deepfake Detection and Explainable Digital Forensics System
+# Multimodal Deepfake Detection and Explainable Digital Forensics System for Images and Videos
 # Planned Dependencies for Python 3.11.x
 # Note: Install inside a dedicated virtual environment (.venv)
 
-# Deep Learning Frameworks
+# Deep Learning Frameworks & Pre-trained Vision Models
 torch>=2.2.0
 torchvision>=0.17.0
-torchaudio>=2.2.0
+timm>=0.9.12
 
 # Scientific Computing & Data Processing
 numpy>=1.26.0,<2.0.0
 pandas>=2.2.0
 scikit-learn>=1.4.0
+scipy>=1.12.0
 
-# Image Processing & Computer Vision
+# Computer Vision, Video Decoding & Face Detection
 opencv-python>=4.9.0.80
 Pillow>=10.2.0
 
-# Audio Processing & Feature Extraction
-librosa>=0.10.1
-soundfile>=0.12.1
-scipy>=1.12.0
-
-# Visualization & Explainability
+# Visualization & Explainability (Grad-CAM)
 matplotlib>=3.8.0
 seaborn>=0.13.0
 

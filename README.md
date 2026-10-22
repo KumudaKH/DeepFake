@@ -1,12 +1,13 @@
-# Multimodal Deepfake Detection and Explainable Digital Forensics System
+# Multimodal Deepfake Detection and Explainable Digital Forensics System for Images and Videos
 
 [![Python 3.11](https://img.shields.io/badge/python-3.11.x-blue.svg)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.2+-ee4c2c.svg)](https://pytorch.org/)
+[![timm](https://img.shields.io/badge/timm-0.9+-green.svg)](https://github.com/huggingface/pytorch-image-models)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688.svg)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-18+-61dafb.svg)](https://reactjs.org/)
 [![License: Academic Research](https://img.shields.io/badge/License-Academic%20Research-lightgrey.svg)](#)
 
-A comprehensive, academic-grade system for detecting image manipulations and synthetic speech using deep learning, accompanied by transparent interpretability heatmaps, acoustic spectrogram analysis, and automated, evidence-backed forensic PDF reports.
+A comprehensive, academic-grade system for detecting image face manipulations and video deepfakes using deep learning, accompanied by transparent interpretability heatmaps (Grad-CAM), temporal identity tracking across video frames, and automated, evidence-backed forensic PDF reports.
 
 Developed as a **Final-Year Computer Science and Engineering Capstone Project**.
 
@@ -14,16 +15,16 @@ Developed as a **Final-Year Computer Science and Engineering Capstone Project**.
 
 ## 1. Executive Summary & Problem Statement
 
-The rapid evolution of generative deep learning models (Diffusion models, GANs, Neural Voice Clones, and Neural Vocoders) has made high-fidelity synthetic media easily accessible. This presents urgent security challenges:
-- **Misinformation and identity fraud** across multimedia platforms.
-- **Biometric authentication vulnerabilities** in facial recognition and voice-banking systems.
-- **Black-box detection skepticism**: Traditional deep neural networks offer predictions without interpretable rationale, which is insufficient for digital forensics, judicial inquiries, or integrity audits.
+The rapid evolution of generative deep learning models (Diffusion models, GANs, Neural Head Reenactments, and DeepFaceLab/FaceSwap pipelines) has made hyper-realistic facial forgery widespread. This poses severe societal risks:
+- **Misinformation and impersonation** in video broadcasts and social platforms.
+- **Biometric authentication bypass** in facial verification gates.
+- **Black-box forensic skepticism**: Raw probability outputs lack transparent, audit-ready rationale required in judicial inquiries and security audits.
 
-This project addresses these challenges by developing a **multimodal detection system** that couples state-of-the-art neural feature extraction with **explainable AI (XAI)** and automated digital forensics reporting. Every forensic assessment provides:
+This project addresses these challenges by developing a multimodal detection system for **images and videos** that couples deep convolutional feature extraction (EfficientNet-B4 / Vision Transformers) with **explainable AI (XAI)** and automated digital forensics reporting. Every forensic assessment provides:
 1. Probabilistic classification with calibrated confidence scores.
-2. Visual or acoustic explainability artifacts (e.g., Grad-CAM spatial heatmaps, frequency spectrogram anomalies).
-3. Plain-English interpretation of detection artifacts.
-4. Comprehensive metadata, limitations, and methodological uncertainty disclosures.
+2. Visual explainability artifacts (Grad-CAM spatial heatmaps isolating facial manipulation artifacts).
+3. Video temporal analysis (uniform frame sampling, YuNet face tracking, frame-level anomaly curves, and aggregate video scores).
+4. Automated, tamper-evident PDF forensic reports complete with cryptographic file hashes (SHA-256), EXIF container metadata, and explicit methodology disclosures.
 
 ---
 
@@ -40,12 +41,12 @@ This project addresses these challenges by developing a **multimodal detection s
           +-------------------------------+-------------------------------+
           |                                                               |
 +-----------------------+                                       +-----------------------+
-|  IMAGE FORENSICS      |                                       |   SPEECH FORENSICS    |
-|  - Preprocessing      |                                       |  - Preprocessing      |
-|  - Face Extraction    |                                       |  - Audio Slicing      |
-|  - Deep Classifier    |                                       |  - Acoustic Features  |
-|  - Grad-CAM Heatmap   |                                       |  - Deep Classifier    |
-|  - Suspicious Regions |                                       |  - Spectrogram / Wave |
+|  SINGLE-IMAGE MODULE  |                                       |   VIDEO FORENSICS     |
+|  - Preprocessing      |                                       |  - Uniform Sampling   |
+|  - YuNet Face Crop    |                                       |  - IoU Face Tracker   |
+|  - EfficientNet-B4    |                                       |  - Per-Frame Scoring  |
+|  - Grad-CAM Heatmap   |                                       |  - Temporal Pooling   |
+|  - Probability Output |                                       |  - Keyframe Extraction|
 +-----------------------+                                       +-----------------------+
           |                                                               |
           +-------------------------------+-------------------------------+
@@ -53,34 +54,36 @@ This project addresses these challenges by developing a **multimodal detection s
 +-----------------------------------------------------------------------------------+
 |                        FORENSIC REPORT GENERATION ENGINE                          |
 |                       ReportLab Automated PDF Generator                           |
-|  - File SHA-256 Hash & EXIF Metadata      - Calibrated Confidence Assessment       |
-|  - Visual / Acoustic Evidence Overlays    - Methodological Uncertainty & Audit    |
+|  - File SHA-256 Hash & Container Metadata - Calibrated Confidence Assessment       |
+|  - Grad-CAM Heatmap Overlays              - Temporal Anomaly Plot & Keyframes     |
+|  - Plain-English Forensic Summary         - Methodological Uncertainty & Audit    |
 +-----------------------------------------------------------------------------------+
 ```
 
-### Module A: Image Deepfake Detection
+### Module A: Single-Image Face Forgery Detection
 - **Input**: User-uploaded images (JPEG, PNG, WebP).
-- **Processing**: Face detection, spatial normalization, and deep feature analysis.
+- **Processing**: YuNet face detection, spatial normalization ($224 \times 224$ pixels), and ImageNet standardization.
 - **Classification**: Binary classification (Likely Authentic vs. Potentially Manipulated).
-- **Explainability**: Gradient-weighted Class Activation Mapping (Grad-CAM) to identify salient regions influencing model decisions.
-- **Forensic Distinction**: Distinguishes between model saliency explanations and verified bounding-box manipulation locations.
+- **Explainability**: Gradient-weighted Class Activation Mapping (Grad-CAM) computed on the final convolutional layer of EfficientNet-B4.
+- **Forensic Distinction**: Distinguishes between model attention heatmaps and verified ground-truth manipulation boundaries.
 
-### Module B: Speech Deepfake Detection
-- **Input**: User-uploaded audio recordings (WAV, MP3, FLAC, OGG).
-- **Processing**: Standardized resampling (16 kHz), silence trimming, and time-frequency transformations (Mel-spectrograms, MFCCs, LFCCs).
-- **Classification**: Synthetic/Spoofed Speech vs. Genuine Human Speech detection.
-- **Explainability**: Waveform temporal analysis, spectral artifact highlighting, and temporal segment scrutiny where supported.
-- **Forensic Interpretation**: Clear narrative explaining acoustic anomalies and spectral inconsistencies.
+### Module B: Video Deepfake Detection & Temporal Aggregation
+- **Input**: User-uploaded video recordings (MP4, AVI, MOV, MKV, WebM).
+- **Frame Sampling**: Uniform temporal sampling ($k = 16$ frames spread evenly over a 300-frame window).
+- **Face Tracking**: High-speed ONNX YuNet detector coupled with IoU identity tracking ($IoU > 0.3$) across consecutive frames to maintain consistent subject focus.
+- **Neural Inference**: Frame-level inference using fine-tuned EfficientNet-B4.
+- **Temporal Aggregation**: Mean logit pooling ($\bar{s} = \frac{1}{k}\sum s_j$) calibrated via logistic sigmoid to produce a video-level manipulation score.
+- **Keyframe Saliency**: Automatically identifies the frame exhibiting the highest anomaly logit and computes Grad-CAM for in-depth forensic inspection.
 
 ### Module C: Explainable Digital Forensics & PDF Reporting
 - **Automated Report Engine**: Generates professional, publication-quality digital forensics reports using ReportLab.
 - **Contents**:
   1. File metadata (Name, Size, MIME type, SHA-256 cryptographic hash, analysis timestamp).
-  2. Model specification, version, and architecture.
-  3. Calibrated confidence rating with categorical uncertainty categorization.
-  4. Embedded visual evidence (Grad-CAM heatmaps, spectrograms, waveforms).
+  2. Model specification, version, and architecture details.
+  3. Calibrated confidence rating with categorical uncertainty boundaries.
+  4. Embedded visual evidence (original image/keyframe, Grad-CAM heatmap overlay, and temporal anomaly curves for video).
   5. Plain-English forensic summary and interpretation.
-  6. Explicit statement of limitations, non-definitive disclaimer, and recommended secondary verification methods.
+  6. Explicit statement of limitations, non-conclusive disclaimer, and recommended secondary verification methods.
 
 ---
 
@@ -90,49 +93,51 @@ This project addresses these challenges by developing a **multimodal detection s
 Deepfake_Forensics_System/
 ├── README.md               # Project documentation and architectural overview
 ├── .gitignore              # Git ignore rules for deep learning, data, and models
-├── requirements.txt        # Python dependency manifest
+├── requirements.txt        # Python dependency manifest (PyTorch, timm, OpenCV, ReportLab, FastAPI)
 ├── .env.example            # Environment variable configuration template
 ├── data/                   # Data directory (kept out of version control)
 │   ├── raw/                # Unprocessed source datasets
-│   │   ├── images/         # Raw benchmark image datasets (e.g., FaceForensics++)
-│   │   └── audio/          # Raw benchmark audio datasets (e.g., ASVspoof)
+│   │   ├── images/         # Raw benchmark image datasets (e.g., 140k Real & Fake Faces)
+│   │   └── videos/         # Raw benchmark video datasets (e.g., FaceForensics++ c23)
 │   └── processed/          # Preprocessed, aligned, and split data
-│       ├── images/         # Normalized face crops and balanced splits
-│       └── audio/          # Standardized 16kHz audio slices and feature caches
+│       ├── images/         # Normalized 224px face crops
+│       └── frames/         # Extracted video frames and crop caches
 ├── models/                 # Model weights and serialized checkpoints
 │   ├── image/              # Trained image detection checkpoints & weights
-│   └── audio/              # Trained audio detection checkpoints & weights
+│   ├── video/              # Trained video detection checkpoints & weights
+│   └── yunet/              # OpenCV YuNet ONNX face detection weights
 ├── src/                    # Core Python application source code
-│   ├── data/               # Dataset loaders, augmentation, and preprocessing scripts
-│   ├── image_detection/    # Model architectures, training, and inference for images
-│   ├── audio_detection/    # Feature extraction, architectures, and inference for speech
-│   ├── explainability/     # Grad-CAM, saliency mapping, and acoustic visualizers
-│   ├── forensics/          # ReportLab PDF report builder and evidence synthesizers
+│   ├── data/               # Dataset loaders, face alignment, and preprocessing scripts
+│   ├── image_detection/    # EfficientNet-B4 architecture, training, and inference for images
+│   ├── video_detection/    # Video decoding, YuNet face tracking, and temporal aggregation
+│   ├── explainability/     # Grad-CAM, saliency mapping, and visual evidence overlay
+│   ├── forensics/          # ReportLab PDF report builder, hashing, and evidence synthesis
 │   └── backend/            # FastAPI service application
 │       └── app/
 │           ├── api/        # REST route definitions (analyze, report, health)
 │           ├── services/   # Business logic (inference dispatch, file handlers)
 │           └── schemas/    # Pydantic request and response schemas
 ├── frontend/               # React / Vite forensic dashboard and reporting interface
-├── notebooks/              # Jupyter research notebooks (EDA, experiments, calibration)
+├── notebooks/              # Jupyter research notebooks (training, evaluation, Kaggle benchmark)
+│   └── ffpp_dfd_face_forgery_benchmark_kaggle_t4x2.ipynb
 ├── reports/                # Generated forensic PDF reports output folder
 ├── docs/                   # Academic project documentation, design specs, review slides
+│   └── dataset_selection_report.md
 └── tests/                  # Unit and integration test suites
 ```
 
 ---
 
-## 4. Planned Technology Stack
+## 4. Technology Stack
 
 | Layer | Technologies | Purpose |
 | :--- | :--- | :--- |
-| **Language** | Python 3.11.x | Core machine learning, backend API, and forensics |
-| **Deep Learning** | PyTorch, Torchvision, Torchaudio | Neural network modeling, inference, and GPU acceleration |
-| **Data & Scientific** | NumPy, Pandas, Scikit-learn, SciPy | Data wrangling, calibration metrics, evaluation metrics |
-| **Computer Vision** | OpenCV, Pillow | Image preprocessing, resizing, and colorspace conversions |
-| **Audio Processing** | Librosa, SoundFile | Acoustic feature extraction (STFT, Mel-scale, MFCCs) |
-| **Visualization** | Matplotlib, Seaborn | Explanatory heatmap generation and spectrogram plotting |
-| **Backend API** | FastAPI, Uvicorn, Pydantic | High-performance asynchronous REST API |
+| **Language** | Python 3.11.x | Core machine learning, video analysis, backend API, and forensics |
+| **Deep Learning** | PyTorch, Torchvision, timm | Neural network modeling, pre-trained EfficientNet-B4, GPU acceleration |
+| **Data & Scientific** | NumPy, Pandas, Scikit-learn, SciPy | Data wrangling, calibration metrics, evaluation metrics (AUC, EER, AP) |
+| **Computer Vision** | OpenCV (`cv2.FaceDetectorYN`), Pillow | Video decoding, YuNet ONNX face detection, IoU tracking, resizing |
+| **Visualization & XAI** | Matplotlib, Seaborn, Grad-CAM | Explanatory heatmap generation and temporal score trajectory plotting |
+| **Backend API** | FastAPI, Uvicorn, Pydantic | High-performance asynchronous REST API for image and video analysis |
 | **Forensic Reports** | ReportLab | Automated, cryptographically linked PDF report generation |
 | **Frontend UI** | React, Vite | Interactive web portal for file analysis and result inspection |
 | **Version Control** | Git | Distributed version control and reproducible tracking |
@@ -141,42 +146,28 @@ Deepfake_Forensics_System/
 
 ## 5. Development Roadmap & Working Method
 
-Development progresses through disciplined, verifiable academic milestones:
-
-- [x] **Stage 1: Initial Setup & Environment Verification** (Current)
-  - Verify Python 3.11 and Git availability.
-  - Establish standardized repository structure.
-  - Define dependencies, security configuration, and version control rules.
-- [ ] **Stage 2: Dataset Selection, Verification & Ingestion Protocols**
-  - Evaluate FaceForensics++, ASVspoof, or vetted Kaggle research benchmarks.
-  - Verify research licenses, class balance, and test/train leakage prevention.
-  - Build reproducible data loaders and preprocessing pipelines.
-- [ ] **Stage 3: Image Deepfake Detection & Explainability Module**
-  - Implement baseline and transfer-learning architectures (e.g., EfficientNet, ResNet).
-  - Integrate Grad-CAM explainability pipeline.
-  - Validate temperature scaling / Platt scaling for confidence calibration.
-- [ ] **Stage 4: Speech Deepfake Detection & Spectral Analysis Module**
-  - Extract acoustic features (Mel-spectrograms / LFCCs).
-  - Train genuine vs. synthetic speech classifier (CNN / ResNet / RNN).
-  - Generate aligned waveform and spectrogram forensic visualizers.
-- [ ] **Stage 5: Digital Forensics Engine & PDF Report Generator**
-  - Integrate file integrity hashing (SHA-256) and EXIF extraction.
+- [x] **Stage 1: Initial Setup & Environment Verification** (Completed)
+- [x] **Stage 2: Dataset Selection, Verification & Benchmark Audit** (Completed)
+  - Scope refined to Image and Video Deepfake Forensics.
+  - Thorough audit of supplied benchmark notebook (`ffpp_dfd_face_forgery_benchmark_kaggle_t4x2.ipynb`).
+  - Selection of 140k Real & Fake Faces (image) and FaceForensics++ c23 / Google DFD (video).
+  - Formalization of YuNet face tracking, uniform frame sampling, and temporal aggregation.
+- [ ] **Stage 3: Environment Setup & Core Utility Library Integration**
+  - Configure Python virtual environment (`.venv`).
+  - Adapt `ffb_video.py` (YuNet face tracker & sampler) into `src/video_detection/`.
+  - Adapt `ffb_metrics.py` (AUC, EER) into `src/forensics/metrics.py`.
+- [ ] **Stage 4: Image Detection & Grad-CAM Explainability Module**
+  - Implement EfficientNet-B4 model wrapper and inference pipeline.
+  - Implement native PyTorch Grad-CAM hook generator with heatmap overlays.
+- [ ] **Stage 5: Video Detection & Temporal Aggregation Engine**
+  - Implement multi-threaded OpenCV video frame sampler.
+  - Implement IoU face tracking across frames.
+  - Implement frame scoring, mean pooling, and keyframe saliency selector.
+- [ ] **Stage 6: Digital Forensics Engine & PDF Report Generator**
+  - Implement SHA-256 cryptographic file hashing and metadata extraction.
   - Build automated PDF generation pipeline using ReportLab.
-  - Formulate structured narrative explanations and uncertainty boundaries.
-- [ ] **Stage 6: FastAPI Backend Integration & Robust File Validation**
-  - Implement RESTful endpoints for image, audio, and report generation.
-  - Add strict MIME validation, file size limits, and sanitization.
-- [ ] **Stage 7: Frontend Forensic Dashboard & Visualizer**
-  - Build modern, accessible UI with drag-and-drop analysis.
-  - Display interactive explainability overlays and instant PDF download.
-- [ ] **Stage 8: Comprehensive Evaluation, Academic Report & Review Defense**
-  - Compute ROC-AUC, EER, Precision, Recall, and Confusion Matrices.
-  - Compile final academic project documentation and presentation.
-
----
-
-## 6. Academic Integrity, Limitations & Forensic Disclaimer
-
-1. **Non-Conclusive Nature**: Machine learning predictions represent probabilistic inferences based on training distributions. They do **not** constitute definitive legal or judicial proof of authenticity or manipulation.
-2. **Explainability Distinction**: Class activation maps (such as Grad-CAM) highlight features influential to the neural network; they must not be conflated with ground-truth pixel-level manipulation masks unless explicitly trained with spatial supervision.
-3. **No Fabrication Policy**: In accordance with academic and scientific standards, this project strictly prohibits the fabrication of experimental metrics, confidence numbers, or forensic artifacts. All reported evaluations are derived from verifiable, reproducible empirical testing.
+- [ ] **Stage 7: FastAPI Backend Service**
+  - RESTful endpoints for image upload, video upload, analysis, and PDF download.
+- [ ] **Stage 8: Frontend Forensic Dashboard & Visualizer**
+  - Modern React / Vite UI with drag-and-drop analysis, frame scrubber, and instant PDF download.
+- [ ] **Stage 9: Academic Documentation, Evaluation & Project Defense**
