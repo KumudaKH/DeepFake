@@ -60,6 +60,19 @@ def test_preprocess_image_invalid_type_raises(mock_detector):
         mock_detector.preprocess_image("invalid_string_not_an_array")
 
 
+def test_preprocess_380px_notebook_resolution():
+    """Verify notebook-compatible preprocessing produces the required 380px tensor."""
+    detector = DeepfakeDetector(
+        model_name="efficientnet_b4",
+        allow_uninitialized=True,
+        input_size=380,
+    )
+    tensor = detector.preprocess_image(np.zeros((120, 160, 3), dtype=np.uint8))
+
+    assert tensor.shape == (1, 3, 380, 380)
+    assert tensor.dtype == torch.float32
+
+
 def test_preprocess_image_invalid_channels_raises(mock_detector):
     """Verify passing a 1-channel or 4-channel image raises ValueError."""
     # 2D grayscale
@@ -144,31 +157,107 @@ def test_refuse_silent_uninitialized_execution():
 
 
 def test_incompatible_checkpoint_raises_valueerror(temp_workspace):
-    """Verify attempting to load an incomplete state dict (missing classifier weights) raises ValueError."""
+    """Verify incomplete state dicts fail exact architecture loading."""
     ckpt_path = temp_workspace / "incompatible_checkpoint.pt"
     # Save a dummy dict that has incompatible keys
     torch.save({"unrelated_layer.weight": torch.randn(10, 10)}, ckpt_path)
 
-    with pytest.raises(ValueError) as exc_info:
-        DeepfakeDetector(checkpoint_path=ckpt_path)
-    assert "missing output classifier weights" in str(exc_info.value).lower()
+    with pytest.raises(ValueError, match="does not exactly match architecture"):
+        DeepfakeDetector(checkpoint_path=ckpt_path, checkpoint_type="uninitialized_mock")
 
 
-def test_valid_checkpoint_loading(temp_workspace):
-    """Verify loading a valid compatible state dict succeeds and correctly records checkpoint metadata."""
-    ckpt_path = temp_workspace / "valid_checkpoint.pt"
+def test_raw_state_dict_cannot_mark_model_trained(temp_workspace):
+    """Verify raw weights without training provenance do not mark the detector trained."""
+    ckpt_path = temp_workspace / "raw_state_dict.pt"
+    base_model = DeepfakeDetector(allow_uninitialized=True)
+    torch.save(base_model.model.state_dict(), ckpt_path)
 
-    # Export genuine architecture state dict
+    with pytest.raises(ValueError, match="no verified deepfake-training metadata"):
+        DeepfakeDetector(checkpoint_path=ckpt_path, checkpoint_type="deepfake_trained")
+
+
+def test_trained_checkpoint_requires_notebook_state_dict_metadata(temp_workspace):
+    """Verify a metadata-wrapped checkpoint must identify its exact export format."""
+    ckpt_path = temp_workspace / "wrong_checkpoint_metadata.pt"
+    base_model = DeepfakeDetector(
+        model_name="efficientnet_b4",
+        allow_uninitialized=True,
+        input_size=380,
+    )
+    metadata = {
+        "format_version": 1,
+        "checkpoint_role": "best_inference",
+        "state_dict_format": "unknown",
+        "task": "deepfake_binary_classification",
+        "model_architecture": "efficientnet_b4",
+        "model_config": {"num_classes": 1},
+        "input_size": 380,
+        "input_transform": "torchvision.transforms.Resize((380,380)), RGB ToTensor, ImageNet normalization",
+        "labels": {"real": 0, "fake": 1},
+        "mean": [0.485, 0.456, 0.406],
+        "std": [0.229, 0.224, 0.225],
+        "best_epoch": 1,
+        "validation_metric": {"name": "roc_auc", "value": 0.5},
+    }
+    torch.save({"state_dict": base_model.model.state_dict(), "metadata": metadata}, ckpt_path)
+
+    with pytest.raises(ValueError, match="state_dict_format"):
+        DeepfakeDetector(
+            model_name="efficientnet_b4",
+            checkpoint_path=ckpt_path,
+            checkpoint_type="deepfake_trained",
+            input_size=380,
+        )
+
+
+def test_checkpoint_with_wrong_classifier_shape_raises(temp_workspace):
+    """Verify a two-logit classifier is rejected by the single-logit inference model."""
+    ckpt_path = temp_workspace / "wrong_classifier_shape.pt"
+    base_model = DeepfakeDetector(allow_uninitialized=True)
+    state_dict = base_model.model.state_dict()
+    state_dict["classifier.weight"] = torch.randn(2, 1792)
+    torch.save(state_dict, ckpt_path)
+
+    with pytest.raises(ValueError, match="does not exactly match architecture"):
+        DeepfakeDetector(checkpoint_path=ckpt_path, checkpoint_type="uninitialized_mock")
+
+
+def test_valid_mock_checkpoint_loads_without_trained_readiness(temp_workspace):
+    """Verify an architecture-compatible test checkpoint remains explicitly untrained."""
+    ckpt_path = temp_workspace / "compatible_mock_checkpoint.pt"
+
     base_model = DeepfakeDetector(allow_uninitialized=True)
     torch.save(base_model.model.state_dict(), ckpt_path)
 
     detector = DeepfakeDetector(
         checkpoint_path=ckpt_path,
-        checkpoint_type="deepfake_trained",
+        checkpoint_type="uninitialized_mock",
     )
 
     assert detector.checkpoint_path == str(ckpt_path.resolve())
-    assert detector.checkpoint_type == "deepfake_trained"
+    assert detector.checkpoint_type == "uninitialized_mock"
+
+
+def test_fp16_checkpoint_weights_are_cast_for_cpu_inference(temp_workspace):
+    """Verify FP16 state-dict tensors become FP32 when loaded onto CPU."""
+    ckpt_path = temp_workspace / "fp16_mock_checkpoint.pt"
+    base_model = DeepfakeDetector(allow_uninitialized=True)
+    fp16_state_dict = {
+        key: value.half() if value.is_floating_point() else value
+        for key, value in base_model.model.state_dict().items()
+    }
+    torch.save(fp16_state_dict, ckpt_path)
+
+    detector = DeepfakeDetector(
+        checkpoint_path=ckpt_path,
+        checkpoint_type="uninitialized_mock",
+        device="cpu",
+    )
+
+    assert all(
+        not tensor.is_floating_point() or tensor.dtype == torch.float32
+        for tensor in detector.model.state_dict().values()
+    )
 
 
 # ==============================================================================

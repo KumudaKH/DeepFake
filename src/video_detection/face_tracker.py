@@ -47,6 +47,29 @@ class VideoExtractionResult:
     status: str  # "success", "partial", "no_faces_detected", "unreadable_video"
     error_message: Optional[str] = None
 
+    @property
+    def num_frames_scanned(self) -> int:
+        """Total number of video frames successfully scheduled and decoded."""
+        return len(self.sampled_indices)
+
+    @property
+    def num_faces_extracted(self) -> int:
+        """Number of valid facial crops extracted across sampled frames."""
+        return self.valid_face_count
+
+    @property
+    def num_unscorable_frames(self) -> int:
+        """Number of sampled frames where no face could be extracted or cropped."""
+        return max(0, len(self.extracted_faces) - self.valid_face_count)
+
+    @property
+    def original_dimensions(self) -> Optional[Tuple[int, int]]:
+        """Original video frame dimensions (width, height), if any frame was decoded."""
+        for face in self.extracted_faces:
+            if face.original_frame_shape:
+                return (face.original_frame_shape[1], face.original_frame_shape[0])
+        return None
+
 
 # ==============================================================================
 # GEOMETRY & FRAME SAMPLING FUNCTIONS
@@ -321,9 +344,16 @@ class FaceTrackerPipeline:
     def extract_from_video(
         self,
         video_path: str | Path,
+        max_frames: Optional[int] = None,
         custom_detector: Optional[FaceDetector] = None,
     ) -> VideoExtractionResult:
-        """Extract facial crops from uniformly sampled frames of a video with identity tracking."""
+        """Extract facial crops from uniformly sampled frames of a video with identity tracking.
+
+        Args:
+            video_path: Path to target video file.
+            max_frames: Optional override for the number of frames to sample (defaults to self.max_frames).
+            custom_detector: Optional custom or mock face detector.
+        """
         path = Path(video_path)
         if not path.is_file():
             return VideoExtractionResult(
@@ -371,7 +401,8 @@ class FaceTrackerPipeline:
             fps = float(cap.get(cv2.CAP_PROP_FPS) or 25.0)
             duration_sec = float(total_frames) / fps if fps > 0 else 0.0
 
-            indices = sample_indices(total_frames, k=self.max_frames, window=self.sample_window)
+            k_samples = int(max_frames) if max_frames is not None else self.max_frames
+            indices = sample_indices(total_frames, k=k_samples, window=self.sample_window)
             if not indices:
                 return VideoExtractionResult(
                     video_path=str(path),

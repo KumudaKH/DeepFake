@@ -17,6 +17,7 @@ import numpy as np
 import timm
 import torch
 import torch.nn as nn
+from PIL import Image
 
 from src.video_detection.face_tracker import ExtractedFace
 
@@ -24,6 +25,7 @@ from src.video_detection.face_tracker import ExtractedFace
 DEFAULT_MEAN = (0.485, 0.456, 0.406)
 DEFAULT_STD = (0.229, 0.224, 0.225)
 DEFAULT_INPUT_SIZE = 224
+SUPPORTED_INPUT_TRANSFORM = "torchvision.transforms.Resize((380,380)), RGB ToTensor, ImageNet normalization"
 
 
 @dataclass
@@ -85,12 +87,15 @@ class DeepfakeDetector:
         device: str = "cpu",
         default_threshold: float = 0.5,
         allow_uninitialized: bool = False,
+        input_size: int = DEFAULT_INPUT_SIZE,
     ) -> None:
         self.model_name = model_name
         self.checkpoint_path = str(checkpoint_path) if checkpoint_path else None
         self.checkpoint_type = checkpoint_type
         self.default_threshold = float(default_threshold)
-        self.input_size = DEFAULT_INPUT_SIZE
+        if input_size <= 0:
+            raise ValueError("input_size must be a positive integer.")
+        self.input_size = int(input_size)
 
         # Configure device (safely defaults to CPU unless CUDA is explicitly requested and available)
         if device.lower().startswith("cuda") and torch.cuda.is_available():
@@ -142,32 +147,120 @@ class DeepfakeDetector:
             )
 
         try:
-            state_dict = torch.load(str(path.resolve()), map_location=self.device, weights_only=True)
+            checkpoint = torch.load(str(path.resolve()), map_location=self.device, weights_only=True)
 
-            # Handle checkpoint structures that wrap weights under a 'state_dict' or 'model' key
-            if isinstance(state_dict, dict) and "state_dict" in state_dict:
-                state_dict = state_dict["state_dict"]
-            elif isinstance(state_dict, dict) and "model" in state_dict:
-                state_dict = state_dict["model"]
+            if not isinstance(checkpoint, dict):
+                raise ValueError("Checkpoint must be a state-dict mapping or a metadata-wrapped checkpoint.")
 
-            # Clean module prefixes if trained with DataParallel / DDP
-            clean_state_dict = {}
+            metadata = checkpoint.get("metadata")
+            if checkpoint_type == "deepfake_trained":
+                if not isinstance(metadata, dict):
+                    raise ValueError(
+                        "Checkpoint has no verified deepfake-training metadata; refusing to mark it trained."
+                    )
+                expected_metadata = {
+                    "format_version": 1,
+                    "checkpoint_role": "best_inference",
+                    "state_dict_format": "torch_state_dict_tensor_mapping",
+                    "task": "deepfake_binary_classification",
+                    "model_architecture": self.model_name,
+                    "input_size": self.input_size,
+                    "input_transform": SUPPORTED_INPUT_TRANSFORM,
+                    "labels": {"real": 0, "fake": 1},
+                }
+                for key, expected_value in expected_metadata.items():
+                    if metadata.get(key) != expected_value:
+                        raise ValueError(
+                            f"Checkpoint training metadata mismatch for '{key}': "
+                            f"expected {expected_value!r}, got {metadata.get(key)!r}."
+                        )
+
+                model_config = metadata.get("model_config")
+                if not isinstance(model_config, dict) or model_config.get("num_classes") != 1:
+                    raise ValueError(
+                        "Checkpoint metadata must identify the single-logit classifier head (num_classes=1)."
+                    )
+
+                mean = np.asarray(metadata.get("mean"), dtype=np.float64)
+                std = np.asarray(metadata.get("std"), dtype=np.float64)
+                if (
+                    mean.shape != (3,)
+                    or std.shape != (3,)
+                    or not np.all(np.isfinite(mean))
+                    or not np.all(np.isfinite(std))
+                    or not np.allclose(mean, DEFAULT_MEAN, rtol=0.0, atol=1e-6)
+                    or not np.allclose(std, DEFAULT_STD, rtol=0.0, atol=1e-6)
+                ):
+                    raise ValueError(
+                        "Checkpoint training normalization does not match the detector's RGB preprocessing."
+                    )
+
+                best_epoch = metadata.get("best_epoch")
+                validation_metric = metadata.get("validation_metric")
+                validation_auc = (
+                    validation_metric.get("value")
+                    if isinstance(validation_metric, dict)
+                    and validation_metric.get("name") == "roc_auc"
+                    else None
+                )
+                if (
+                    not isinstance(best_epoch, int)
+                    or best_epoch < 1
+                    or not isinstance(validation_auc, (int, float))
+                    or not np.isfinite(validation_auc)
+                    or not 0.0 <= validation_auc <= 1.0
+                ):
+                    raise ValueError(
+                        "Checkpoint metadata must record a completed epoch and finite validation ROC-AUC."
+                    )
+
+            if "state_dict" in checkpoint:
+                state_dict = checkpoint["state_dict"]
+            elif "model_state_dict" in checkpoint:
+                state_dict = checkpoint["model_state_dict"]
+            elif "model" in checkpoint:
+                state_dict = checkpoint["model"]
+            else:
+                state_dict = checkpoint
+            if not isinstance(state_dict, dict) or not state_dict:
+                raise ValueError("Checkpoint does not contain a non-empty model state dict.")
+            if not all(isinstance(key, str) and isinstance(value, torch.Tensor) for key, value in state_dict.items()):
+                raise ValueError("Checkpoint state dict must contain only string keys and tensor values.")
+
+            clean_state_dict: Dict[str, torch.Tensor] = {}
             for k, v in state_dict.items():
                 clean_key = k[7:] if k.startswith("module.") else k
+                if clean_key in clean_state_dict:
+                    raise ValueError(f"Checkpoint contains duplicate state-dict key after prefix cleanup: {clean_key}")
                 # Cast FP16 weights to FP32 if running on CPU to prevent CPU FP16 execution errors
                 if self.device.type == "cpu" and v.is_floating_point():
                     clean_state_dict[clean_key] = v.float()
                 else:
                     clean_state_dict[clean_key] = v
 
-            missing_keys, unexpected_keys = self.model.load_state_dict(clean_state_dict, strict=False)
-
-            # If the classifier head was missing or incompatible, report error
-            head_missing = any("classifier" in k or "fc" in k or "head" in k for k in missing_keys)
-            if head_missing:
+            expected_state_dict = self.model.state_dict()
+            missing_keys = expected_state_dict.keys() - clean_state_dict.keys()
+            unexpected_keys = clean_state_dict.keys() - expected_state_dict.keys()
+            mismatched_shapes = [
+                f"{key}: expected {tuple(expected_state_dict[key].shape)}, got {tuple(clean_state_dict[key].shape)}"
+                for key in expected_state_dict.keys() & clean_state_dict.keys()
+                if expected_state_dict[key].shape != clean_state_dict[key].shape
+            ]
+            if missing_keys or unexpected_keys or mismatched_shapes:
                 raise ValueError(
-                    f"Checkpoint at {path.name} is missing output classifier weights for architecture '{self.model_name}'."
+                    f"Checkpoint at {path.name} does not exactly match architecture '{self.model_name}' "
+                    "and its single-logit classifier. "
+                    f"Missing keys: {sorted(missing_keys)}; unexpected keys: {sorted(unexpected_keys)}; "
+                    f"shape mismatches: {mismatched_shapes}"
                 )
+
+            try:
+                self.model.load_state_dict(clean_state_dict, strict=True)
+            except RuntimeError as exc:
+                raise ValueError(
+                    f"Checkpoint at {path.name} does not exactly match architecture "
+                    f"'{self.model_name}' and its single-logit classifier: {exc}"
+                ) from exc
 
             self.checkpoint_path = str(path.resolve())
             self.checkpoint_type = checkpoint_type
@@ -182,7 +275,7 @@ class DeepfakeDetector:
         """Validate and preprocess a single image array into a normalized PyTorch tensor.
 
         Expects an RGB uint8 image of shape (H, W, 3).
-        Returns a normalized float32 tensor of shape (1, 3, 224, 224) on self.device.
+        Returns a normalized float32 tensor of shape (1, 3, input_size, input_size) on self.device.
         """
         if not isinstance(image, np.ndarray):
             raise TypeError(f"Expected numpy.ndarray image, got {type(image).__name__}")
@@ -194,10 +287,15 @@ class DeepfakeDetector:
         if h <= 0 or w <= 0:
             raise ValueError(f"Invalid image dimensions: {w}x{h}")
 
-        # Resize to model input size if needed
+        # Match torchvision Resize on the notebook's PIL RGB inputs.
         if h != self.input_size or w != self.input_size:
-            interp = cv2.INTER_AREA if (h > self.input_size or w > self.input_size) else cv2.INTER_CUBIC
-            resized = cv2.resize(image, (self.input_size, self.input_size), interpolation=interp)
+            resized = np.array(
+                Image.fromarray(image).resize(
+                    (self.input_size, self.input_size),
+                    resample=Image.Resampling.BILINEAR,
+                ),
+                dtype=np.uint8,
+            )
         else:
             resized = image
 

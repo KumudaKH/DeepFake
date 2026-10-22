@@ -144,30 +144,136 @@ Deepfake_Forensics_System/
 
 ---
 
-## 5. Development Roadmap & Working Method
+## 5. Development Roadmap & Completed Milestones
 
 - [x] **Stage 1: Initial Setup & Environment Verification** (Completed)
 - [x] **Stage 2: Dataset Selection, Verification & Benchmark Audit** (Completed)
   - Scope refined to Image and Video Deepfake Forensics.
-  - Thorough audit of supplied benchmark notebook (`ffpp_dfd_face_forgery_benchmark_kaggle_t4x2.ipynb`).
+  - Thorough audit of benchmark notebook (`ffpp_dfd_face_forgery_benchmark_kaggle_t4x2.ipynb`).
   - Selection of 140k Real & Fake Faces (image) and FaceForensics++ c23 / Google DFD (video).
   - Formalization of YuNet face tracking, uniform frame sampling, and temporal aggregation.
-- [ ] **Stage 3: Environment Setup & Core Utility Library Integration**
-  - Configure Python virtual environment (`.venv`).
-  - Adapt `ffb_video.py` (YuNet face tracker & sampler) into `src/video_detection/`.
-  - Adapt `ffb_metrics.py` (AUC, EER) into `src/forensics/metrics.py`.
-- [ ] **Stage 4: Image Detection & Grad-CAM Explainability Module**
-  - Implement EfficientNet-B4 model wrapper and inference pipeline.
-  - Implement native PyTorch Grad-CAM hook generator with heatmap overlays.
-- [ ] **Stage 5: Video Detection & Temporal Aggregation Engine**
-  - Implement multi-threaded OpenCV video frame sampler.
-  - Implement IoU face tracking across frames.
-  - Implement frame scoring, mean pooling, and keyframe saliency selector.
-- [ ] **Stage 6: Digital Forensics Engine & PDF Report Generator**
-  - Implement SHA-256 cryptographic file hashing and metadata extraction.
-  - Build automated PDF generation pipeline using ReportLab.
-- [ ] **Stage 7: FastAPI Backend Service**
-  - RESTful endpoints for image upload, video upload, analysis, and PDF download.
-- [ ] **Stage 8: Frontend Forensic Dashboard & Visualizer**
-  - Modern React / Vite UI with drag-and-drop analysis, frame scrubber, and instant PDF download.
-- [ ] **Stage 9: Academic Documentation, Evaluation & Project Defense**
+- [x] **Stage 3: Core Utility Library Integration & Anti-Leakage Data Splitting** (Completed)
+  - Configured Python virtual environment (`.venv`) and pinned dependencies.
+  - Adapted YuNet face tracker and uniform frame sampler into `src/video_detection/`.
+  - Anti-leakage video pair splitting and dataset validation suite.
+- [x] **Stage 4: Image Detection & Grad-CAM Explainability Module** (Completed)
+  - Implemented EfficientNet-B4 inference engine with calibrated logit outputs.
+  - Implemented PyTorch Grad-CAM hook generator with colorized spatial overlays.
+  - Comprehensive unit test suite covering numeric bounds, determinism, and layer hooks.
+- [x] **Stage 5: Video Detection & Temporal Aggregation Engine** (Completed)
+  - Implemented uniform temporal frame sampling ($k = 16$).
+  - Implemented YuNet face detector with IoU identity tracking across consecutive frames.
+  - Implemented frame-level anomaly scoring, temporal mean pooling, and keyframe saliency extraction.
+- [x] **Stage 6: Digital Forensics Engine & PDF/HTML Report Generator** (Completed)
+  - SHA-256 cryptographic file hashing and EXIF container metadata extraction.
+  - Calibrated uncertainty thresholds and forensic methodology disclosures.
+  - Automated report generation with embedded Grad-CAM overlays and temporal trajectory charts.
+- [x] **Stage 7: FastAPI Backend Service** (Completed)
+  - RESTful endpoints (`/api/detect/image`, `/api/detect/video`, `/api/report`, `/api/health`).
+  - Dynamic model checkpoint discovery with zero-downtime weight binding.
+  - Full request validation and error handling.
+- [x] **Stage 8: Modern React / Vite Forensic Dashboard** (Completed)
+  - Sleek, dark-mode cybersecurity UI built with React, Vite, and TailwindCSS.
+  - Real-time drag-and-drop file upload with live progress tracking.
+  - Interactive Grad-CAM heatmap viewer, frame scrubber, and forensic report exporter.
+- [ ] **Stage 9: Model Training on GPU & Final Defense Preparation** (Next Step)
+  - Run the Kaggle / Colab training notebook (`notebooks/ffpp_dfd_face_forgery_benchmark_kaggle_t4x2.ipynb`) on GPU.
+  - Export `model_best_fp16.pt` and place it in `models/image/`.
+
+---
+
+## 6. Quick Start & Setup Guide
+
+### Prerequisites
+- **Python**: 3.11.x (recommended)
+- **Node.js**: 18+ and `npm`
+- **Git**
+
+### Installation
+
+1. **Clone the repository:**
+   ```bash
+   git clone <REPO_URL>
+   cd DEEPFAKE
+   ```
+
+2. **Backend Setup (Python):**
+   ```bash
+   # Create virtual environment
+   python -m venv .venv
+
+   # Activate virtual environment
+   # On Windows (PowerShell):
+   .\.venv\Scripts\Activate.ps1
+   # On Windows (cmd):
+   .\.venv\Scripts\activate.bat
+   # On Linux/macOS:
+   source .venv/bin/activate
+
+   # Install Python dependencies
+   pip install -r requirements.txt
+   ```
+
+3. **Frontend Setup (Node.js / React):**
+   ```bash
+   cd frontend
+   npm install
+   cd ..
+   ```
+
+---
+
+## 7. Running the Application
+
+### One-Click Launch (Windows)
+- **Backend**: Double-click `run_backend.bat` (starts FastAPI at `http://127.0.0.1:8000`)
+- **Frontend**: Double-click `run_frontend.bat` (starts Vite dev server at `http://localhost:5173`)
+
+### Manual Launch
+
+**Terminal 1 — FastAPI Backend:**
+```bash
+.\.venv\Scripts\python -m uvicorn src.backend.app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+*Health Check*: Open [http://127.0.0.1:8000/api/health](http://127.0.0.1:8000/api/health) in your browser.
+
+**Terminal 2 — React Frontend:**
+```bash
+cd frontend
+npm run dev
+```
+*Web Dashboard*: Open [http://localhost:5173](http://localhost:5173) in your browser.
+
+---
+
+## 8. Running the Test Suite
+
+Execute the complete automated test suite (69 unit & integration tests) covering image detection, video tracking, Grad-CAM hooks, and FastAPI REST endpoints:
+
+```bash
+.\.venv\Scripts\pytest -v
+```
+
+---
+
+## 9. Checkpoint Deployment & Model Training
+
+The system comes pre-configured with **YuNet ONNX face detection weights** (`models/yunet/face_detection_yunet_2023mar.onnx`) and operates in **Calibrated Demo Mode** out of the box.
+
+To deploy fully trained weights:
+1. Run the training notebook `notebooks/ffpp_dfd_face_forgery_benchmark_kaggle_t4x2.ipynb` in Kaggle (T4x2 GPU) or Google Colab.
+2. Download the resulting checkpoint file `model_best_fp16.pt`.
+3. Place it in `models/image/`:
+   ```
+   models/image/model_best_fp16.pt
+   ```
+4. The backend automatically discovers and loads the trained weights without requiring a server restart! See [`docs/checkpoint_deployment_guide.md`](file:///c:/Users/Nethr/OneDrive/Documents/DEEPFAKE/docs/checkpoint_deployment_guide.md) for full details.
+
+---
+
+## 10. How to Continue & Extend This Work
+
+- **Add New Detectors**: Extend `src/image_detection/detector.py` or `src/video_detection/face_tracker.py` to support other backbones (e.g., Vision Transformers, ConvNeXt, MesoNet).
+- **Audio Deepfake Detection**: Add audio feature extraction (spectrograms, MFCCs) under `src/audio_detection/` to build a full audiovisual detector.
+- **Explainability Enhancements**: Extend `src/explainability/gradcam.py` with Score-CAM, Eigen-CAM, or frequency-domain artifact visualization.
+- **Frontend Visualizations**: Modify `frontend/src/pages/` to add custom forensic inspection tools, frequency spectrum graphs, or multi-subject tracking timelines.

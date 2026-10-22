@@ -257,3 +257,32 @@ def test_extract_from_video_no_faces_detected(temp_workspace):
     # All face crops should be None
     assert all(f.crop_rgb is None for f in result.extracted_faces)
     assert all(f.tracking_status == "none" for f in result.extracted_faces)
+
+
+def test_extract_from_video_max_frames_override_and_properties(temp_workspace):
+    """Verify that extract_from_video respects max_frames override and exposes helper properties."""
+    vid_path = temp_workspace / "override_test_video.mp4"
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    out = cv2.VideoWriter(str(vid_path), fourcc, 10.0, (100, 80))
+    for _ in range(12):
+        frame = np.full((80, 100, 3), 50, dtype=np.uint8)
+        frame[20:60, 20:60] = 200
+        out.write(frame)
+    out.release()
+
+    mock_box = np.array([[20.0, 20.0, 40.0, 40.0, 0.9]], dtype=np.float32)
+    custom_det = MockDetector(mock_box)
+
+    # Pipeline configured with default max_frames=8
+    pipeline = FaceTrackerPipeline(yunet_model_path=None, max_frames=8, sample_window=12)
+
+    # Call with max_frames=4 override
+    result = pipeline.extract_from_video(vid_path, max_frames=4, custom_detector=custom_det)
+
+    assert result.status == "success"
+    assert len(result.extracted_faces) == 4
+    assert result.num_frames_scanned == 4
+    assert result.num_faces_extracted == 4
+    assert result.num_unscorable_frames == 0
+    assert result.original_dimensions == (100, 80)
+

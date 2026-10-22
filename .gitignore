@@ -83,11 +83,13 @@ models/unet/*
 !models/unet/.gitkeep
 models/yunet/*
 !models/yunet/.gitkeep
+!models/yunet/face_detection_yunet_2023mar.onnx
 models/audio/*
 !models/audio/.gitkeep
 models/**/*.pt
 models/**/*.pth
 models/**/*.onnx
+!models/yunet/face_detection_yunet_2023mar.onnx
 models/**/*.bin
 models/**/*.h5
 models/**/*.safetensors

@@ -10,11 +10,11 @@
 
 ## 1. Overview and Architecture Specification
 
-The deepfake classification engine employs a fine-tuned **EfficientNet-B4** backbone (`efficientnet_b4.ra2_in1k` via `timm`), mirroring the high-performance benchmark architecture evaluated on FaceForensics++ (c23) and Google DeepFake Detection (DFD).
+The image classification engine uses the **EfficientNet-B4** architecture (`efficientnet_b4` via `timm`) matching the existing training notebook. No genuine trained checkpoint is currently available in the workspace, so the application remains in Demo Mode until verified weights are loaded.
 
 ```
 +-----------------------------------------------------------------------------------+
-|                            INPUT: RGB Facial Crop (224 x 224)                     |
+|                         INPUT: RGB Image / Crop (380 x 380)                       |
 +-----------------------------------------------------------------------------------+
                                           |
                               ImageNet Normalization
@@ -41,8 +41,8 @@ The deepfake classification engine employs a fine-tuned **EfficientNet-B4** back
 ```
 
 ### Architectural Hyperparameters
-* **Backbone:** EfficientNet-B4 (`timm`) ImageNet-pretrained initialization.
-* **Input Resolution:** $224 \times 224 \times 3$ RGB pixels.
+* **Backbone:** EfficientNet-B4 (`timm`) with ImageNet-pretrained training initialization.
+* **Input Resolution:** $380 \times 380 \times 3$ RGB pixels; direct images and tracked video face crops use the same resize.
 * **Classifier Head:** Single linear layer mapping the 1,792-dimensional pooled feature vector to a continuous scalar logit $s \in \mathbb{R}$.
 * **Loss Function (during training):** Binary Cross-Entropy with Logits (`BCEWithLogitsLoss`), inversely weighted to class sizes.
 
@@ -57,9 +57,11 @@ In compliance with academic integrity and application security standards:
 2. **Safe Deserialization (`weights_only=True`)**:
    Model checkpoint loading enforces `torch.load(..., weights_only=True)` to prevent arbitrary code execution attacks via malicious pickle payloads.
 3. **Architecture Compatibility Validation**:
-   When loading a checkpoint, the engine validates that the output classifier weights match the expected single-logit architecture. Missing or mismatched linear heads raise an explicit `ValueError`.
+   A checkpoint is marked `deepfake_trained` only when its metadata identifies the deepfake task, `efficientnet_b4`, the single-logit head, 380-pixel preprocessing, matching normalization, `REAL=0` / `FAKE=1` labels, state-dict packaging, a completed best epoch, and finite validation ROC-AUC. The complete state dict is then loaded strictly; missing, unexpected, or shape-mismatched tensors raise an explicit `ValueError`. Raw state dicts (including ImageNet or random weights) cannot mark the service trained.
 4. **Precision & Device Management**:
    Checkpoints trained in FP16 (e.g. `model_best_fp16.pt` from Kaggle 2× T4 GPUs) are automatically cast to FP32 when running on CPU to prevent CPU execution incompatibility. Inference defaults to CPU and enables CUDA only when explicitly requested and available.
+5. **Readiness**:
+   `/api/health` reports `model_readiness` as `trained` only after metadata and strict state-dict checks succeed. Without such a checkpoint, the service remains in demo mode and its verdict is inconclusive.
 
 ---
 
@@ -76,13 +78,14 @@ from src.image_detection.detector import DeepfakeDetector
 
 # Initialize detector with a verified checkpoint
 detector = DeepfakeDetector(
-    model_name="efficientnet_b4.ra2_in1k",
+    model_name="efficientnet_b4",
     checkpoint_path="models/image/model_best_fp16.pt",
     device="cpu",
     default_threshold=0.5,
+    input_size=380,
 )
 
-# Load RGB image
+# Load RGB image; the detector resizes it to 380x380 before ImageNet normalization.
 img_bgr = cv2.imread("data/raw/images/sample.jpg")
 img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
 
@@ -105,7 +108,11 @@ tracker = FaceTrackerPipeline(yunet_model_path="models/yunet/face_detection_yune
 result = tracker.extract_from_video("data/raw/videos/sample.mp4", max_frames=16)
 
 # Score all extracted face crops
-detector = DeepfakeDetector(checkpoint_path="models/image/model_best_fp16.pt")
+detector = DeepfakeDetector(
+    model_name="efficientnet_b4",
+    checkpoint_path="models/image/model_best_fp16.pt",
+    input_size=380,
+)
 frame_predictions = detector.predict_video_faces(result.extracted_faces)
 
 for fp in frame_predictions:
@@ -137,7 +144,7 @@ for fp in frame_predictions:
   "predicted_label": "fake",
   "decision_threshold": 0.5,
   "is_provisional_threshold": true,
-  "model_architecture": "efficientnet_b4.ra2_in1k",
+  "model_architecture": "efficientnet_b4",
   "checkpoint_path": "models/image/model_best_fp16.pt",
   "checkpoint_type": "deepfake_trained",
   "device": "cpu",
@@ -166,6 +173,6 @@ for fp in frame_predictions:
 - [x] **Safe Checkpoint Management**: Implemented with `weights_only=True` and strict uninitialized execution guards.
 - [x] **Batch & Video Scoring Integration**: Implemented with temporal metadata and missing-face preservation.
 - [x] **Unit Test Suite**: 13 comprehensive tests in [`tests/test_image_detector.py`](file:///c:/Users/Nethr/OneDrive/Documents/DEEPFAKE/tests/test_image_detector.py) (all 32 repository tests passing).
-- [ ] **Stage 8 (Next)**: Implement the **Grad-CAM Explainability Module** (`src/explainability/gradcam.py`) targeting the final convolutional head of EfficientNet-B4.
-- [ ] **Stage 9**: Implement the **Temporal Aggregator & Keyframe Selector** (`src/video_detection/temporal_aggregator.py`).
+- [x] **Stage 8**: Implemented the **Grad-CAM Explainability Module** ([`src/explainability/gradcam.py`](file:///c:/Users/Nethr/OneDrive/Documents/DEEPFAKE/src/explainability/gradcam.py)) targeting the final convolutional head of EfficientNet-B4.
+- [ ] **Stage 9 (Next)**: Implement the **Temporal Aggregator & Keyframe Selector** (`src/video_detection/temporal_aggregator.py`).
 - [ ] **Stage 10**: Implement the **ReportLab Digital Forensics PDF Generator** (`src/forensics/report_generator.py`).
