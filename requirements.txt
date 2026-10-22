@@ -1,40 +1,38 @@
 # Multimodal Deepfake Detection and Explainable Digital Forensics System for Images and Videos
-# Planned Dependencies for Python 3.11.x
-# Note: Install inside a dedicated virtual environment (.venv)
+# Python 3.11.x Compatible Dependencies
+# Note: Install inside the project virtual environment (.venv)
 
-# Deep Learning Frameworks & Pre-trained Vision Models
-torch>=2.2.0
-torchvision>=0.17.0
+# Deep Learning Frameworks (CPU build for local inference/forensics; Colab handles GPU training)
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.2.0,<2.5.0
+torchvision>=0.17.0,<0.20.0
 timm>=0.9.12
 
 # Scientific Computing & Data Processing
 numpy>=1.26.0,<2.0.0
-pandas>=2.2.0
-scikit-learn>=1.4.0
 scipy>=1.12.0
+scikit-learn>=1.4.0
+pandas>=2.2.0
 
-# Computer Vision, Video Decoding & Face Detection
+# Computer Vision & Image Processing
 opencv-python>=4.9.0.80
 Pillow>=10.2.0
 
-# Visualization & Explainability (Grad-CAM)
+# Visualization & Explainability (Grad-CAM overlays)
 matplotlib>=3.8.0
 seaborn>=0.13.0
 
-# Backend API Framework
+# Backend REST API Framework
 fastapi>=0.110.0
 uvicorn[standard]>=0.28.0
 pydantic>=2.6.0
 python-multipart>=0.0.9
 
-# Digital Forensics & Automated PDF Report Generation
+# Digital Forensics Engine & PDF Report Generation
 reportlab>=4.1.0
 
-# Environment Configuration & Utilities
+# Configuration, Utilities & Testing
 python-dotenv>=1.0.1
 requests>=2.31.0
 tqdm>=4.66.0
-
-# Testing & Code Quality
 pytest>=8.0.0
-pytest-asyncio>=0.23.0
